@@ -1,0 +1,736 @@
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.InteropServices;
+using UnityEngine.UI;
+using ILCCL.Saves;
+using Object = UnityEngine.Object;
+using Random = UnityEngine.Random;
+
+namespace ILCCL.Patches;
+
+[HarmonyPatch]
+public class ScreenPatch
+{
+    private static bool _initialized;
+    private static int _delay;
+    private static int _dd = 10;
+    private static int _foc;
+    private static int _dir;
+    private static MappedMenu _menu;
+    private static bool _newScreen;
+    
+    private static int? _nextTitleScreenId;
+    private static int? _nextScreenId;
+
+    private const int MAX_VANILLA_SCREEN = 1000;
+    private const int PRIORITY_SCREEN_ID = 1001;
+    private const int FIRST_LAUNCH_SCREEN_ID = 1002;
+    private const int EXCEPTION_SCREEN_ID = 1003;
+
+    [HarmonyPatch(typeof(UnmappedMenus), nameof(UnmappedMenus.rt))]
+    [HarmonyPrefix]
+    public static void Menus_rt_Pre(ref int a)
+    {
+        if (StackTracePatch.HasException)
+        {
+            _nextScreenId = a;
+            _nextTitleScreenId = EXCEPTION_SCREEN_ID;
+            StackTracePatch.HasException = false;
+            a = 1;
+        }
+    }
+
+    /*
+     * Patch:
+     * - Adds a screen to warn the user about potential issues with using mods.
+     * - Adds a screen to set the priority of override mods.
+     */
+    [HarmonyPatch(typeof(bv), nameof(bv.Start))]
+    [HarmonyPostfix]
+    public static void SceneTitles_Start(bv __instance)
+    {
+        _foc = 0;
+        _dir = 0;
+        _delay = 0;
+        _dd = 10;
+        if (_nextTitleScreenId != null)
+        {
+            switch (_nextTitleScreenId)
+            {
+                case EXCEPTION_SCREEN_ID:
+                    MappedMenus.screen = _nextTitleScreenId.Value;
+                    _nextTitleScreenId = null;
+                    MappedMenus.tab = 0;
+                    MappedMenus.page = 0;
+                    MappedMenus.Load();
+                    __instance.gLicense.SetActive(false);
+                    if (MappedMenus.gBackArrow != null)
+                    {
+                        MappedMenus.gBackArrow.SetActive(false);
+                    }
+                    Object.Destroy(GameObject.Find("Logo"));
+                    GameObject obj = Object.Instantiate(MappedSprites.gMenu[1]);
+                    obj.transform.position = new Vector3(0f, 50f, 0f);
+                    obj.transform.localScale = new Vector3(1f, 1f, 1f);
+                    RectTransform rt = obj.transform.Find("Title").transform as RectTransform;
+                    rt.sizeDelta *= 5;
+                    obj.transform.SetParent(MappedMenus.gDisplay.transform, false);
+                    Object.Destroy(obj.transform.Find("Background").gameObject);
+                    Object.Destroy(obj.transform.Find("Border").gameObject);
+                    Object.Destroy(obj.transform.Find("Highlight").gameObject);
+                    var text = "<color=#EF0000>EXCEPTION</color>\nAn exception has occurred " + Describe(StackTracePatch.ExceptionScreen) + ".\nPlease check the log file for more information and report it to the mod author if necessary.\n" +
+                               "You can try to continue playing, but the game may not function correctly. Click the button below to continue.\n\nException:\n" +
+                               StackTracePatch.ExceptionMessage;
+                    if (StackTracePatch.ExceptionScreen == "Save")
+                    {
+                        text += "\n\n<color=#EF0000>WARNING</color>\nThe error occurred while saving the game. It is recommended to load a backup save file, as the save file may be corrupted.";
+                    } else if (StackTracePatch.ExceptionScreen == "Loading")
+                    {
+                        text += "\n\n<color=#EF0000>WARNING</color>\nThis error occurred while loading the game. This may cause the save file to not be loaded correctly, so continuing is highly discouraged.";
+                    }
+                    obj.transform.Find("Title").gameObject.GetComponent<Text>().text = text;
+                        
+                    break;
+                default:
+                    MappedMenus.screen = _nextTitleScreenId.Value;
+                    MappedMenus.tab = 0;
+                    MappedMenus.page = 0;
+                    MappedMenus.Load();
+                    __instance.gLicense.SetActive(false);
+                    if (MappedMenus.gBackArrow != null)
+                    {
+                        MappedMenus.gBackArrow.SetActive(false);
+                    }
+                    Object.Destroy(GameObject.Find("Logo"));
+                    GameObject obj2 = Object.Instantiate(MappedSprites.gMenu[1]);
+                    obj2.transform.position = new Vector3(0f, 50f, 0f);
+                    obj2.transform.localScale = new Vector3(1f, 1f, 1f);
+                    RectTransform rt2 = obj2.transform.Find("Title").transform as RectTransform;
+                    rt2.sizeDelta *= 5;
+                    obj2.transform.SetParent(MappedMenus.gDisplay.transform, false);
+                    Object.Destroy(obj2.transform.Find("Background").gameObject);
+                    Object.Destroy(obj2.transform.Find("Border").gameObject);
+                    Object.Destroy(obj2.transform.Find("Highlight").gameObject);
+                    obj2.transform.Find("Title").gameObject.GetComponent<Text>().text =
+                        "<color=#EF0000>NO SCREEN</color>\nThis screen does not exist! Screen ID: " +
+                        _nextTitleScreenId;
+                    _nextTitleScreenId = null;
+                    break;
+            }
+        }
+        else if (MetaFile.Data.FirstLaunch)
+        {
+            MappedMenus.RemoveExisting();
+            MappedMenus.screen = FIRST_LAUNCH_SCREEN_ID;
+            MappedMenus.tab = 0;
+            MappedMenus.page = 0;
+            MappedMenus.Load();
+            __instance.gLicense.SetActive(false);
+            if (MappedMenus.gBackArrow != null)
+            {
+                MappedMenus.gBackArrow.SetActive(false);
+            }
+            Object.Destroy(GameObject.Find("Logo"));
+            GameObject obj = Object.Instantiate(MappedSprites.gMenu[1]);
+            obj.transform.position = new Vector3(0f, 50f, 0f);
+            obj.transform.localScale = new Vector3(1f, 1f, 1f);
+            RectTransform rt = obj.transform.Find("Title").transform as RectTransform;
+            rt.sizeDelta *= 5;
+            obj.transform.SetParent(MappedMenus.gDisplay.transform, false);
+            Object.Destroy(obj.transform.Find("Background").gameObject);
+            Object.Destroy(obj.transform.Find("Border").gameObject);
+            Object.Destroy(obj.transform.Find("Highlight").gameObject);
+            obj.transform.Find("Title").gameObject.GetComponent<Text>().text =
+                "<color=#EF0000>IMPORTANT NOTICE</color>\nWhile ILCCL tries its best to keep modded save files stable and consistent between game updates and mod changes, you may still encounter issues. ILCCL automatically creates backups (up to 100 by default). However, it is recommended to manually create backups of your save file. The save file can be found in %USERPROFILE%/AppData/LocalLow/MDickie/Infinite Lives. If you encounter any issues, please report them in the Infinite Lives Modding Discord server.";
+        }
+        else if (!_initialized && HasConflictingOverrides && !MetaFile.Data.HidePriorityScreenNextTime)
+        {
+            MappedMenus.RemoveExisting();
+            MappedMenus.screen = PRIORITY_SCREEN_ID;
+            MappedMenus.tab = 0;
+            MappedMenus.page = 0;
+            MappedMenus.Load();
+            __instance.gLicense.SetActive(false);
+            if (MappedMenus.gBackArrow != null)
+            {
+                MappedMenus.gBackArrow.SetActive(false);
+            }
+            Object.Destroy(GameObject.Find("Logo"));
+
+            GameObject obj = Object.Instantiate(UnmappedSprites.gwx[1]);
+            obj.transform.position = new Vector3(0f, 315f, 0f);
+            obj.transform.localScale = new Vector3(1f, 1f, 1f);
+            RectTransform rt = obj.transform.Find("Title").transform as RectTransform;
+            rt.sizeDelta *= 2;
+            obj.transform.SetParent(MappedMenus.gDisplay.transform, false);
+            Object.Destroy(obj.transform.Find("Background").gameObject);
+            Object.Destroy(obj.transform.Find("Border").gameObject);
+            Object.Destroy(obj.transform.Find("Highlight").gameObject);
+            obj.transform.Find("Title").gameObject.GetComponent<Text>().text =
+                "Order the override mods by the desired priority:";
+
+
+            _initialized = true;
+        }
+    }
+
+    private static string Describe(string screen)
+    {
+        switch (screen)
+        {
+            case "Loading":
+                return "when loading the game";
+            case "Titles":
+                return "in the title screen";
+            case "Trophies":
+                return "in the achievements screen";
+            case "Select_Character":
+                return "in the character selection screen";
+            case "Roster_Editor":
+                return "in the federation editor screen";
+            case "Game":
+                return "during gameplay";
+            case "Save":
+                return "when saving the game";
+            default:
+                return "in the " + screen.ToLower() + " screen";
+        }
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool SetCursorPos(int X, int Y);
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+    
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    /*
+     * Patch:
+     * - Tick loop for the extra screens in Titles.
+     */
+    [HarmonyPatch(typeof(bv), nameof(bv.Update))]
+    [HarmonyPrefix]
+    public static bool SceneTitles_Update()
+    {
+        try
+        {
+            if (MappedMenus.screen > MAX_VANILLA_SCREEN)
+            {
+                MappedControls.GetInput();
+                MappedMenus.FindClicks();
+                if (_newScreen)
+                {
+                    bool flag = false;
+                    for (MappedMenus.cyc = 1;
+                         MappedMenus.cyc <= MappedMenus.no_menus;
+                         MappedMenus.cyc++)
+                    {
+                            if (((MappedMenu)MappedMenus.menu[MappedMenus.cyc]).clicked != 0)
+                            {
+                                ((MappedMenu)MappedMenus.menu[MappedMenus.cyc]).clicked = 0;
+                                flag = true;
+                            }
+                    }
+                    if (!flag)
+                    {
+                        _newScreen = false;
+                    }
+                }
+            }
+            if (MappedMenus.screen == PRIORITY_SCREEN_ID)
+            {
+                MappedMenus.UpdateDisplay();
+                if (MappedMenus.foc > 0 && ((MappedMenu)MappedMenus.menu[MappedMenus.foc]).clicked != 0)
+                {
+                    _foc = MappedMenus.foc;
+                }
+                else if (MappedMenus.foc > 0 && _menu != null)
+                {
+                    _foc = 0;
+                    _dd = 10;
+                    _dir = 0;
+                    MappedSprites.ChangeColour(_menu.gBackground, 0.8f, 0.8f, 0.8f);
+                    _menu = null;
+                }
+
+                if (_foc >= Prefixes.Count + 1)
+                {
+                    if (_foc == Prefixes.Count + 2)
+                    {
+                        MetaFile.Data.HidePriorityScreenNextTime = true;
+                    }
+
+                    Sound.Play(MappedSound.proceed, 0f, 0.5f);
+                    List<string> prefixes = new();
+                    for (int i = 1; i < Prefixes.Count + 1; i++)
+                    {
+                        string text = ((MappedMenu)MappedMenus.menu[i]).value;
+                        prefixes.Add(text);
+                    }
+
+                    Prefixes = prefixes;
+                    SavePrefixes();
+                    MappedSound.musicChannel.Stop();
+                    MappedSound.musicFile[0] = MappedGlobals.LoadAsset("Music", "Theme01") as AudioClip;
+                    MappedSound.musicChannel.clip = MappedSound.musicFile[0];
+                    MappedSound.musicChannel.time = 0f;
+                    MappedSound.musicChannel.Play();
+                    MappedMenus.ChangeScreen(1);
+                }
+                else if (_foc > 0 && _delay <= 0)
+                {
+                    MappedMenu menu = MappedMenus.menu[_foc];
+                    if (_dir == 0)
+                    {
+                        _dir = menu.clicked >= 0 ? 1 : -1;
+                    }
+                    MappedController controller = MappedControls.pad[MappedControls.host];
+                    if (_dir < 0)
+                    {
+                        if (_foc > 1)
+                        {
+                            MappedMenu menu2 = MappedMenus.menu[_foc - 1];
+                            (menu.value, menu2.value) = (menu2.value, menu.value);
+                            if (_menu != null)
+                            {
+                                MappedSprites.ChangeColour(_menu.gBackground, 0.8f, 0.8f, 0.8f);
+                            }
+
+                            _menu = menu2;
+                            MappedMenus.foc--;
+                            if (controller.type <= 1)
+                            {
+                                var prevPos = menu2.box.transform.position;
+                                var newPos = menu.box.transform.position;
+                                var diff = prevPos - newPos;
+                                POINT point;
+                                GetCursorPos(out point);
+                                SetCursorPos(point.X + (int)diff.x, point.Y - (int)diff.y);
+                            }
+
+                            _delay = _dd;
+                            if (_dd > 1)
+                            {
+                                _dd -= 1;
+                            }
+
+                            _foc--;
+                        }
+                    }
+                    else if (_dir > 0)
+                    {
+                        if (_foc < Prefixes.Count)
+                        {
+                            MappedMenu menu2 = MappedMenus.menu[_foc + 1];
+                            (menu.value, menu2.value) = (menu2.value, menu.value);
+                            if (_menu != null)
+                            {
+                                MappedSprites.ChangeColour(_menu.gBackground, 0.8f, 0.8f, 0.8f);
+                            }
+
+                            _menu = menu2;
+                            MappedMenus.foc++;
+                            if (controller.type <= 1)
+                            {
+                                var prevPos = menu2.box.transform.position;
+                                var newPos = menu.box.transform.position;
+                                var diff = prevPos - newPos;
+                                POINT point;
+                                GetCursorPos(out point);
+                                SetCursorPos(point.X + (int)diff.x, point.Y - (int)diff.y);
+                            }
+
+                            _delay = _dd;
+                            if (_dd > 1)
+                            {
+                                _dd -= 1;
+                            }
+
+                            _foc++;
+                        }
+                    }
+                }
+
+                if (_menu != null)
+                {
+                    if (_dir < 0)
+                    {
+                        MappedSprites.ChangeColour(_menu.gBackground, 0.3f, 0.9f, 0.3f);
+                    } else if (_dir > 0)
+                    {
+                        MappedSprites.ChangeColour(_menu.gBackground, 0.9f, 0.3f, 0.3f);
+                    }
+                }
+                MappedMenus.oldFoc = MappedMenus.foc;
+                _delay--;
+
+                return false;
+            }
+
+            if (MappedMenus.screen == FIRST_LAUNCH_SCREEN_ID)
+            {
+                MappedMenus.UpdateDisplay();
+                
+                if (((MappedMenu)MappedMenus.menu[1]).clicked != 0)
+                {
+                    Sound.Play(MappedSound.proceed, 0f, 0.5f);
+                    MetaFile.Data.FirstLaunch = false;
+                    MetaFile.Data.Save();
+                    MappedMenus.ChangeScreen(1);
+                }
+
+                return false;
+            }
+            
+            if (MappedMenus.screen == EXCEPTION_SCREEN_ID)
+            {
+                MappedMenus.UpdateDisplay();
+                
+                if (((MappedMenu)MappedMenus.menu[1]).clicked != 0)
+                {
+                    Sound.Play(MappedSound.proceed, 0f, 0.5f);
+                    var next = _nextScreenId!.Value;
+                    _nextScreenId = null;
+                    MappedMenus.ChangeScreen(next);
+                }
+
+                return false;
+            }
+        }
+        catch (Exception e)
+        {
+            LogError(e);
+        }
+
+        return true;
+    }
+
+    /*
+     * Patch:
+     * - Loads the menus for the extra screens.
+     */
+    [HarmonyPatch(typeof(UnmappedMenus), nameof(UnmappedMenus.rz))]
+    [HarmonyPrefix]
+    public static bool Menus_cds_Pre(int a)
+    {
+        if (MappedMenus.screen > MAX_VANILLA_SCREEN || (MappedMenus.screen == 50 && (MappedMenus.page == 0 || MappedMenus.page == 5) && MappedMatch.state == 0))
+        {
+            _newScreen = true;
+            MappedMenus.RemoveExisting();
+            MappedMenus.foc = 0;
+            MappedMenus.no_menus = a;
+            MappedMenus.menu = new UnmappedMenu[MappedMenus.no_menus + 1];
+            for (MappedMenus.cyc = 1;
+                 MappedMenus.cyc <= MappedMenus.no_menus;
+                 MappedMenus.cyc++)
+            {
+                MappedMenus.menu[MappedMenus.cyc] = new UnmappedMenu();
+                ((MappedMenu) MappedMenus.menu[MappedMenus.cyc]).id = MappedMenus.cyc;
+            }
+
+            MappedMenus.scrollX = 0f;
+            MappedMenus.scrollSpeedX = 0f;
+            MappedMenus.scrollY = 0f;
+            MappedMenus.scrollSpeedY = 0f;
+            if (MappedMenus.screen == PRIORITY_SCREEN_ID)
+            {
+                int rows;
+                int columns;
+                float scale;
+                int startX;
+                int startY;
+                FindBestFit(Prefixes.Count, -450, -200, 450, 250, out rows, out columns, out scale, out startX,
+                    out startY);
+                int index = 0;
+                foreach (string prefix in SortPrev(Prefixes))
+                {
+                    MappedMenus.Add();
+                    float x = startX + (index % columns * 210 * scale);
+                    float y = startY - (index / columns * 50 * scale);
+                    ((MappedMenu) MappedMenus.menu[MappedMenus.no_menus]).Load(2,
+                        "#" + (index + 1) +
+                        (index == 0 ? " (highest)" : index == Prefixes.Count - 1 ? " (lowest)" : ""), x, y, scale,
+                        scale);
+                    ((MappedMenu) MappedMenus.menu[MappedMenus.no_menus]).value = prefix;
+                    MappedSprites.ChangeColour(((MappedMenu) MappedMenus.menu[MappedMenus.no_menus]).gBackground, 0.8f, 0.8f,
+                        0.8f);
+                    index++;
+                }
+
+                MappedMenus.Add();
+                ((MappedMenu) MappedMenus.menu[MappedMenus.no_menus]).Load(1, "Proceed", -150f, -280, 1.25f, 1.25f);
+                MappedMenus.Add();
+                ((MappedMenu) MappedMenus.menu[MappedMenus.no_menus]).Load(1, "Proceed & Hide", 150f, -280, 1.25f, 1.25f);
+            }
+            else if (MappedMenus.screen == FIRST_LAUNCH_SCREEN_ID)
+            {
+                MappedMenus.Add();
+                ((MappedMenu) MappedMenus.menu[MappedMenus.no_menus]).Load(1, "Proceed", 0f, -280, 1.25f, 1.25f);
+            }
+            else if (MappedMenus.screen == EXCEPTION_SCREEN_ID)
+            {
+                MappedMenus.Add();
+                ((MappedMenu) MappedMenus.menu[MappedMenus.no_menus]).Load(1, GetDisappointmentPhrase(), 0f, -280, 1.25f, 1.25f);
+            }
+            else if (MappedMenus.screen == 50 && MappedMatch.state == 0)
+            {
+                if (MappedMenus.page == 0)
+                {
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "> Resume >", 0f, 220f, 1.6f, 1.6f);
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "Camera", 0f, 100f, 1.6f, 1.6f);
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "Map", 0f, 0f, 1.6f, 1.6f);
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "Fast Travel", 0, -100f, 1.6f, 1.6f);
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "< Exit <", 0f, -220f, 1.6f, 1.6f);
+                }
+                else
+                {
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(2, "Location", 0f, 120f, 1.6f, 1.6f);
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "> Travel >", 0f, -20f, 1.6f, 1.6f);
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "< Exit <", 0f, -120f, 1.6f, 1.6f);
+                    MappedMenus.Add();
+                    ((MappedMenu)MappedMenus.menu[MappedMenus.no_menus]).Load(1, "Cost: Free", 0f, 50f, 0.8f, 0.8f);
+
+                }
+            }
+            
+            MappedMenus.MeasureOptions();
+            if (UnmappedMenus.Control() > 0 && MappedMenus.no_menus > 0 && _foc == 0)
+            {
+                _foc = 1;
+            }
+
+            MappedMenus.oldFoc = _foc;
+            MappedMenus.commit = 0;
+            MappedKeyboard.entryFoc = 0;
+            MappedMenus.moveFoc = 0;
+            MappedMenus.tapStart = 0;
+            MappedMenus.tapEnd = 0;
+            MappedMenus.gotim = 0f;
+            MappedControls.keytim = 10f;
+            return false;
+        }
+        return true;
+    }
+
+    private static readonly List<string> DISAPPOINTMENT_PHRASES = new()
+    {
+        "0 to 100 real quick",
+        "0/10 would not recommend",
+        "1 star",
+        "Absolutely terrible",
+        "Alas",
+        "At least it didn't crash",
+        "Aw, snap",
+        "Bad RNG",
+        "Be better",
+        "Bet",
+        "Big oof",
+        "Blast",
+        "Blimey",
+        "Bro why",
+        "Bro's chopped",
+        "Broken game",
+        "Bruh",
+        "Bummer",
+        "Clapped",
+        "Could be worse",
+        "Couldn't get past this part",
+        "Crap",
+        "Cringe",
+        "Curses",
+        "D'oh",
+        "Dagnabbit",
+        "Dang",
+        "Darn it",
+        "Deadass",
+        "Devs suck",
+        "Did I do that?",
+        "Do better next time",
+        "Drat",
+        "Epic fail",
+        "Everything's broken",
+        "F",
+        "FR?",
+        "Facts",
+        "FeelsBadMan",
+        "Fiddlesticks",
+        "Figures",
+        "Forgive me",
+        "GG",
+        "Game broke",
+        "Game over",
+        "Git gud",
+        "Good grief",
+        "Happens to the best of us",
+        "Holy moly",
+        "How unfortunate",
+        "I am error",
+        "I blame Ingo",
+        "I blame Mat",
+        "I can't even",
+        "I didn't mean to do that",
+        "I didn't see that coming",
+        "I hate this",
+        "I messed up",
+        "I might have done a thing",
+        "I swear it worked before",
+        "I tried my best",
+        "I'm sorry",
+        "Ingo's fault",
+        "It is what it is",
+        "It's not a bug, it's a feature",
+        "Jiminy Cricket",
+        "Just my luck",
+        "L + Ratio",
+        "L gameplay",
+        "L",
+        "LMAO",
+        "Lame",
+        "Literally unplayable",
+        "Mat's fault",
+        "Maybe next time",
+        "Meh",
+        "Mood",
+        "My bad",
+        "My condolences",
+        "Never lucky",
+        "No cap",
+        "No kidding",
+        "No one saw that, right?",
+        "No u",
+        "No way",
+        "No!",
+        "Not again",
+        "Not fair",
+        "Not impressed",
+        "Not it",
+        "Not pog",
+        "Not recommended",
+        "Oh dear",
+        "Oh no",
+        "On God?",
+        "Oopsie daisy",
+        "Owned",
+        "PepeHands",
+        "Please don't hate me",
+        "Please fix",
+        "RIP",
+        "Rats",
+        "Really now",
+        "Refund now",
+        "Rekt",
+        "Roasted",
+        "Rough day",
+        "SMH",
+        "Sadge",
+        "Same",
+        "Seriously",
+        "Shame",
+        "Shoot",
+        "Skill issue",
+        "So sad",
+        "So true bestie",
+        "Sorry, my bad",
+        "Squirrel",
+        "Sus",
+        "That wasn't supposed to happen",
+        "That's life",
+        "That's rough",
+        "This is bad",
+        "This is fine",
+        "This is not ideal",
+        "This is not my fault",
+        "This is unacceptable",
+        "Try again",
+        "Typical",
+        "Unbelievable",
+        "Uninstalling",
+        "Unlucky",
+        "User error",
+        "Weaksauce",
+        "Well, that escalated quickly",
+        "Well, that happened",
+        "Well, this is awkward",
+        "Well, this is embarrassing",
+        "Well, this is unexpected",
+        "What a pity",
+        "What are the odds",
+        "What the heck",
+        "What",
+        "Whoops",
+        "Why me",
+        "Woe is me",
+        "Worst game ever",
+        "Y tho",
+        "Yikes",
+        "You win this time"
+    };
+    
+    private static string GetDisappointmentPhrase()
+    {
+        return DISAPPOINTMENT_PHRASES[Random.Range(0, DISAPPOINTMENT_PHRASES.Count)];
+    }
+    
+    private static IEnumerable<string> SortPrev(List<string> prefixes)
+    {
+        var prev = MetaFile.Data.PrefixPriorityOrder;
+        var sorted = new List<string>();
+        foreach (var prefix in prev)
+        {
+            if (prefixes.Contains(prefix))
+            {
+                sorted.Add(prefix);
+            }
+        }
+        foreach (var prefix in prefixes)
+        {
+            if (!sorted.Contains(prefix))
+            {
+                sorted.Add(prefix);
+            }
+        }
+        return sorted;
+    }
+
+    [HarmonyPatch(typeof(UnmappedMenus), nameof(UnmappedMenus.rt))]
+    [HarmonyTranspiler]
+    public static IEnumerable<CodeInstruction> Menus_rt(IEnumerable<CodeInstruction> instructions)
+    {
+        CodeInstruction prev = null;
+        CodeInstruction prev2 = null;
+        foreach (var instruction in instructions)
+        {
+            yield return instruction;
+            if (prev2 != null && (instruction.opcode == OpCodes.Beq_S || instruction.opcode == OpCodes.Beq) &&
+                prev.opcode == OpCodes.Ldc_I4_S && (sbyte)prev.operand == 90 && prev2.opcode == OpCodes.Ldsfld &&
+                (FieldInfo)prev2.operand == AccessTools.Field(typeof(UnmappedMenus), nameof(UnmappedMenus.fhy)))
+            {
+                yield return new CodeInstruction(prev2);
+                yield return new CodeInstruction(OpCodes.Ldc_I4, MAX_VANILLA_SCREEN);
+                if (instruction.opcode == OpCodes.Beq_S)
+                {
+                    yield return new CodeInstruction(OpCodes.Bge_S, instruction.operand);
+                }
+                else
+                {
+                    yield return new CodeInstruction(OpCodes.Bge, instruction.operand);
+                }
+            }
+            prev2 = prev;
+            prev = instruction;
+        }
+    }
+}
