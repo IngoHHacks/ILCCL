@@ -3,6 +3,7 @@ using ILCCL.Content;
 using ILCCL.Animation;
 using ILCCL.API;
 using ILCCL.Saves;
+using System.Globalization;
 
 namespace ILCCL;
 
@@ -12,7 +13,7 @@ public class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "IngoH.InfiniteLives.ILCCL";
     public const string PluginName = "ILCCL";
-    public const string PluginVer = "0.2.0";
+    public const string PluginVer = "0.2.1";
     public const string PluginPatchVer = "";
     public const string PluginVerLong = "v" + PluginVer + PluginPatchVer;
     public const float PluginVersion = 1.06f;
@@ -179,9 +180,9 @@ public class Plugin : BaseUnityPlugin
 
             this.RegisterCustomButton("Unlock All Characters", () =>
             {
-                for (int i = 0; i <Progress.charUnlock.Length; i++)
+                for (int i = 0; i < Progress.charUnlock.Length; i++)
                 {
-                    Progress.charUnlock[i] = 1;
+                    Progress.charUnlock[i] = Math.Max(Progress.charUnlock[i], 1);
                 }
                 MappedSaveSystem.request = 1;
                 return "All characters unlocked!";
@@ -191,7 +192,7 @@ public class Plugin : BaseUnityPlugin
             {
                 for (int i = 0; i < Progress.mapUnlock.Length; i++)
                 {
-                    Progress.mapUnlock[i] = 1;
+                    Progress.mapUnlock[i] = 2;
                 }
                 MappedSaveSystem.request = 1;
                 return "All maps unlocked!";
@@ -209,13 +210,13 @@ public class Plugin : BaseUnityPlugin
 
             this.RegisterCustomButton("Unlock Everything", () =>
             {
-                for (int i = 0; i <Progress.charUnlock.Length; i++)
+                for (int i = 0; i < Progress.charUnlock.Length; i++)
                 {
-                    Progress.charUnlock[i] = 1;
+                    Progress.charUnlock[i] = Math.Max(Progress.charUnlock[i], 1);
                 }
                 for (int i = 0; i < Progress.mapUnlock.Length; i++)
                 {
-                    Progress.mapUnlock[i] = 1;
+                    Progress.mapUnlock[i] = 2;
                 }
                 for (int i = 0; i < Progress.trophy.Length; i++)
                 {
@@ -248,8 +249,9 @@ public class Plugin : BaseUnityPlugin
                 File.Copy(vanillaSave, save);
             }
             else
-            {
-                bf.bxk(); // Restore default
+            {   
+                MappedControls.DetectControllers();
+                bf.bxh(); // Restore default
                 bf.bxl(); // Save
             }
         }

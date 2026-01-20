@@ -14,11 +14,15 @@ internal class MenuPatch
     [HarmonyPostfix]
     public static void Menus_rv()
     {
-         var text = GameObject.Find("Version").GetComponent<Text>(); 
+         var text = GameObject.Find("Version").GetComponent<Text>();
+         if (!text || text.text.Contains("ILCCL"))
+         {
+             return;
+         }
          text.text = $"\n\n\n\n\n\n{text.text}\n\n\n<color=white>ILCCL {Plugin.PluginVerLong}\nMods Loaded:\n{LoadContent.NumContentMods} Content\n{AllMods.Instance.NumMods} Code</color>";
          text.horizontalOverflow = HorizontalWrapMode.Overflow;
          text.verticalOverflow = VerticalWrapMode.Overflow;
-         text.fontSize -= 4;
+         text.fontSize = 16;
     }
 
     private static int _location;
