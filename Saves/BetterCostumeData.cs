@@ -7,22 +7,38 @@ namespace ILCCL.Saves;
 
 internal class BetterCostumeData
 {
-    public float[] b = new float[40];
+    public float?[] b = new float?[40];
 
-    public int charID;
+    public int? charID;
 
     public string[] fleshC = new string[40];
 
-    public float[] g = new float[40];
-    public int id;
+    public float?[] g = new float?[40];
+    public int? id;
 
-    public int limb;
+    public int? limb;
 
-    public float[] r = new float[40];
+    public float?[] r = new float?[40];
 
     public string[] shapeC = new string[40];
 
     public string[] textureC = new string[40];
+
+    public int? gender;
+
+    public int? age;
+
+    public float? height;
+
+    public float? headSize;
+
+    public float? bodyMass;
+
+    public float? muscleMass;
+
+    public float? armMass;
+
+    public int? prop;
 
 
     public static BetterCostumeData FromRegularCostumeData(Costume costume)

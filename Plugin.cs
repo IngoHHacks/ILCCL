@@ -3,7 +3,6 @@ using ILCCL.Content;
 using ILCCL.Animation;
 using ILCCL.API;
 using ILCCL.Saves;
-using System.Globalization;
 
 namespace ILCCL;
 
@@ -13,7 +12,7 @@ public class Plugin : BaseUnityPlugin
 {
     public const string PluginGuid = "IngoH.InfiniteLives.ILCCL";
     public const string PluginName = "ILCCL";
-    public const string PluginVer = "0.2.1";
+    public const string PluginVer = "0.2.2";
     public const string PluginPatchVer = "";
     public const string PluginVerLong = "v" + PluginVer + PluginPatchVer;
     public const float PluginVersion = 1.06f;

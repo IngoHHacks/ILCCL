@@ -20,6 +20,8 @@ internal class BetterCharacterData
 
     public string alias;
 
+    public int? allegiance;
+
     public float? angle;
 
     public int? anim;
@@ -173,6 +175,8 @@ internal class BetterCharacterData
     public string teamName;
 
     public int? toilet;
+
+    public int? transform;
 
     public float? visibility;
 
